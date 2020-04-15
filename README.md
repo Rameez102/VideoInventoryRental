@@ -71,3 +71,5 @@ A: <b> I think that connecting temporary rental box with client http session is 
     
 Q: ConcurrentHashMap for tests instead of H2?    
 A: <b>H2 is additional weight for Spring Context, I used minimmum configuration in order to make all tests run faster.</b>
+# VideoInventoryRental
+# VideoInventoryRental
