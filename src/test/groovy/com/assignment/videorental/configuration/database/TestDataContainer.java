@@ -1,0 +1,117 @@
+package com.assignment.videorental.configuration.database;
+
+import com.assignment.videorental.customer.Customer;
+import com.assignment.videorental.customer.CustomerDTO;
+import com.assignment.videorental.customer.CustomerRepository;
+import com.assignment.videorental.film.Film;
+import com.assignment.videorental.film.FilmDTO;
+import com.assignment.videorental.film.FilmRepository;
+import com.assignment.videorental.film.FilmType;
+import com.assignment.videorental.infrastructure.database.DataContainer;
+import com.assignment.videorental.rental.RentFilmEntryDTO;
+import com.assignment.videorental.rental.RentalOrderRepository;
+import com.assignment.videorental.rental.RentalRepository;
+import com.assignment.videorental.shared.domain.PersonalData;
+import com.assignment.videorental.shared.dto.PersonalDataDTO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.util.Optional;
+
+@Component
+public class TestDataContainer extends DataContainer {
+
+    @Autowired
+    public TestDataContainer(FilmRepository filmRepository, CustomerRepository customerRepository, RentalRepository rentalRepository, RentalOrderRepository rentalOrderRepository) {
+        super(filmRepository, customerRepository, rentalRepository, rentalOrderRepository);
+    }
+
+    public RentFilmEntryDTO matrixEntry(Integer days) {
+        return new RentFilmEntryDTO(Identifiers.ONE, days, BigDecimal.ZERO);
+    }
+
+    public RentFilmEntryDTO spiderManEntry(Integer days) {
+        return new RentFilmEntryDTO(Identifiers.TWO, days, BigDecimal.ZERO);
+    }
+
+    public RentFilmEntryDTO outOfAfricaEntry(Integer days) {
+        return new RentFilmEntryDTO(Identifiers.FOUR, days, BigDecimal.ZERO);
+    }
+
+    public CustomerDTO customerDTO() {
+        Customer customer = customer();
+        PersonalDataDTO personalData = personalDataDTO(customer.getPersonalData());
+        return CustomerDTO.builder()
+                .id(Identifiers.ONE)
+                .currency(customer.getCurrency().name())
+                .bonusPoints(Optional.ofNullable(customer.getBonusPoints()).orElse(0))
+                .personalData(personalData)
+                .build();
+    }
+
+    private PersonalDataDTO personalDataDTO(PersonalData personalData) {
+        return PersonalDataDTO.builder()
+                .firstName(personalData.getFirstName())
+                .lastName(personalData.getLastName())
+                .email(personalData.getEmail())
+                .build();
+    }
+
+    public FilmDTO newGodfatherDTO() {
+        return FilmDTO.builder()
+                .title("Godfather")
+                .barCode("F11439")
+                .type(FilmType.OLD.name())
+                .build();
+    }
+
+    public FilmDTO matrixDTO() {
+        Film matrix = matrix();
+        return FilmDTO.builder()
+                .id(Identifiers.ONE)
+                .title(matrix.getTitle())
+                .barCode(matrix.getBarCode())
+                .type(matrix.getType().name())
+                .build();
+    }
+
+    public FilmDTO spiderManDTO() {
+        Film spiderMan = spiderMan();
+        return FilmDTO.builder()
+                .id(Identifiers.TWO)
+                .title(spiderMan.getTitle())
+                .barCode(spiderMan.getBarCode())
+                .type(spiderMan.getType().name())
+                .build();
+    }
+
+
+    public FilmDTO spiderManBetterOneDTO() {
+        Film spiderManBetterOne = spiderManBetterOne();
+        return FilmDTO.builder()
+                .id(Identifiers.THREE)
+                .title(spiderManBetterOne.getTitle())
+                .barCode(spiderManBetterOne.getBarCode())
+                .type(spiderManBetterOne.getType().name())
+                .build();
+    }
+
+    public FilmDTO outOfAfricaDTO() {
+        Film outOfAfrica = outOfAfrica();
+        return FilmDTO.builder()
+                .id(Identifiers.FOUR)
+                .title(outOfAfrica.getTitle())
+                .barCode(outOfAfrica.getBarCode())
+                .type(outOfAfrica.getType().name())
+                .build();
+    }
+
+    private static final class Identifiers {
+        private static final Long ONE = 1L;
+        private static final Long TWO = 2L;
+        private static final Long THREE = 3L;
+        private static final Long FOUR = 4L;
+    }
+
+}

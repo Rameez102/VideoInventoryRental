@@ -1,0 +1,108 @@
+package com.assignment.videorental.rental;
+
+import static java.time.temporal.ChronoUnit.DAYS;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.Optional;
+
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+import com.assignment.videorental.customer.Customer;
+import com.assignment.videorental.film.FilmType;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Entity
+public class Rental {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(columnDefinition = "CUSTOMER_ID")
+    private Customer customer;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate rentDate;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate expectedReturnDate;
+
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    private LocalDate actualReturnDate;
+
+    @Enumerated(EnumType.STRING)
+    private FilmType filmType;
+
+    @Enumerated(EnumType.STRING)
+    private RentalStatus rentalStatus;
+
+    private BigDecimal price = BigDecimal.ZERO;
+    private BigDecimal surcharge = BigDecimal.ZERO;
+
+    public Rental rent(LocalDate rentDate) {
+        this.rentalStatus = RentalStatus.STARTED;
+        this.rentDate = rentDate;
+        this.price = calculatePrice();
+        return this;
+    }
+
+    public Rental returnFilm(LocalDate returnDate) {
+        if (isReturned()) {
+            throw new FilmAlreadyReturnedException(Collections.singletonMap("rentalId", String.valueOf(id)));
+        }
+
+        this.actualReturnDate = returnDate;
+        this.rentalStatus = RentalStatus.END;
+        this.surcharge = calculateSurcharge();
+        return this;
+    }
+
+    private BigDecimal calculateSurcharge() {
+        if (!isReturned()) {
+            return BigDecimal.ZERO;
+        }
+
+        Integer expectedDaysOfRental = getExpectedDaysOfRental();
+        Integer lateDaysOfRental = getLateDaysOfRental();
+        return filmType.calculateSurcharge(lateDaysOfRental, expectedDaysOfRental);
+    }
+
+    private BigDecimal calculatePrice() {
+        Integer expectedDaysOfRental = getExpectedDaysOfRental();
+        return filmType.calculatePrice(expectedDaysOfRental);
+    }
+
+    private Integer getExpectedDaysOfRental() {
+        return BigDecimal.valueOf(DAYS.between(rentDate, expectedReturnDate)).intValue();
+    }
+
+    private Integer getLateDaysOfRental() {
+        long lateDays = DAYS.between(expectedReturnDate, actualReturnDate);
+        long noLateDays = 0;
+        return BigDecimal.valueOf(lateDays <= noLateDays ? noLateDays : lateDays).intValue();
+    }
+
+    private boolean isReturned() {
+        return Optional.ofNullable(actualReturnDate).isPresent();
+    }
+}

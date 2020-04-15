@@ -1,0 +1,182 @@
+package com.assignment.videorental.integration
+
+import com.assignment.videorental.configuration.database.DatabaseConfiguration
+import com.assignment.videorental.configuration.rental.RentalConfiguration
+import com.assignment.videorental.customer.CustomerController
+import com.assignment.videorental.customer.CustomerRepository
+import com.assignment.videorental.infrastructure.IntegrationSpec
+import com.assignment.videorental.infrastructure.config.Profiles
+import com.assignment.videorental.rental.RentFilmEntryDTO
+import com.assignment.videorental.rental.RentalController
+import com.assignment.videorental.rental.RentalOrderDraftDTO
+import com.assignment.videorental.shared.time.TimeProvider
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.context.annotation.Profile
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.mock.web.MockHttpSession
+import org.springframework.test.context.ContextConfiguration
+import org.springframework.test.web.servlet.ResultActions
+import org.springframework.test.web.servlet.result.MockMvcResultHandlers
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+
+@Profile(Profiles.TEST)
+@ContextConfiguration(classes = [
+        RentalConfiguration.class,
+        TimeProvider.class,
+        DatabaseConfiguration.class
+])
+@SpringBootTest
+class RentalControllerIntegrationSpec extends IntegrationSpec {
+
+    @Autowired
+    private RentalController rentalController
+
+    @Autowired
+    private CustomerController customerController
+
+    @Autowired
+    private CustomerRepository customerRepository
+
+    def setup() {
+        dataContainer.initializeCustomers()
+        dataContainer.initializeFilms()
+
+        mockMvc = MockMvcBuilders
+                .standaloneSetup(rentalController)
+                .setControllerAdvice(restControllerAdvice)
+                .alwaysDo(MockMvcResultHandlers.print())
+                .build()
+
+        httpSession = new MockHttpSession()
+    }
+
+    def 'should add film to box'() {
+        when: 'I add Matrix to rental box'
+        Integer matrixRentalDays = 1
+        RentFilmEntryDTO matrixFilm = dataContainer.matrixEntry(matrixRentalDays)
+
+        ResultActions resultAction = this.mockMvc
+                .perform(post('/api/rentals/box')
+                .session(httpSession)
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .content(buildJson(matrixFilm)))
+
+        then: 'I get rental details with 3 Eur total price'
+        httpSession.getId() >> "1"
+
+        RentFilmEntryDTO expectedMatrixEntryWithPrice = matrixFilm.toBuilder()
+                .price(BigDecimal.valueOf(3))
+                .numberOfDays(matrixRentalDays)
+                .build()
+
+        RentalOrderDraftDTO expectedRentalOrderDraft = RentalOrderDraftDTO.builder()
+                .films(Arrays.asList(expectedMatrixEntryWithPrice))
+                .totalPrice(BigDecimal.valueOf(3))
+                .build()
+
+        resultAction
+                .andExpect(status().isOk())
+                .andExpect(content().json(buildJson(expectedRentalOrderDraft)))
+
+    }
+
+    def 'should not add film to box twice'() {
+        when: 'I add Matrix to rental box'
+        Integer matrixRentalDays = 1
+        RentFilmEntryDTO matrixFilm = dataContainer.matrixEntry(matrixRentalDays)
+
+        ResultActions addMatrixToBoxResultAction = this.mockMvc
+                .perform(post('/api/rentals/box')
+                .session(httpSession)
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .content(buildJson(matrixFilm)))
+
+        then: 'I get rental details with 3 Eur total price'
+        httpSession.getId() >> "1"
+
+        RentFilmEntryDTO expectedMatrixEntryWithPrice = matrixFilm.toBuilder()
+                .price(BigDecimal.valueOf(3))
+                .numberOfDays(matrixRentalDays)
+                .build()
+
+        RentalOrderDraftDTO expectedRentalOrderDraft = RentalOrderDraftDTO.builder()
+                .films(Arrays.asList(expectedMatrixEntryWithPrice))
+                .totalPrice(BigDecimal.valueOf(3))
+                .build()
+
+        addMatrixToBoxResultAction
+                .andExpect(status().isOk())
+                .andExpect(content().json(buildJson(expectedRentalOrderDraft)))
+
+        when: 'I try to add Matrix second time'
+        ResultActions addMatrixToBoxResultActionFailure = this.mockMvc
+                .perform(post('/api/rentals/box')
+                .session(httpSession)
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .content(buildJson(matrixFilm)))
+
+        then: 'Film cannot be added twice'
+        addMatrixToBoxResultActionFailure
+                .andExpect(status().is(HttpStatus.EXPECTATION_FAILED.value()))
+    }
+
+    def 'should remove film from box'() {
+        when: 'I add Matrix to rental box'
+        Integer matrixRentalDays = 1
+        RentFilmEntryDTO matrixFilm = dataContainer.matrixEntry(matrixRentalDays)
+
+        ResultActions addMatrixToBoxResultAction = this.mockMvc
+                .perform(post('/api/rentals/box')
+                .session(httpSession)
+                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                .content(buildJson(matrixFilm)))
+
+        then: 'I get rental details with 3 EUR total price'
+        httpSession.getId() >> "1"
+
+        RentFilmEntryDTO expectedMatrixEntryWithPrice = matrixFilm.toBuilder()
+                .price(BigDecimal.valueOf(3))
+                .numberOfDays(matrixRentalDays)
+                .build()
+
+        RentalOrderDraftDTO expectedRentalOrderDraft = RentalOrderDraftDTO.builder()
+                .films(Arrays.asList(expectedMatrixEntryWithPrice))
+                .totalPrice(BigDecimal.valueOf(3))
+                .build()
+
+        addMatrixToBoxResultAction
+                .andExpect(status().isOk())
+                .andExpect(content().json(buildJson(expectedRentalOrderDraft)))
+
+        when: 'I remove film from box'
+        ResultActions removeMatrixFromBoxResultAction = this.mockMvc
+                .perform(delete('/api/rentals/box?filmId={filmId}', matrixFilm.getFilmId())
+                .session(httpSession)
+                .contentType(MediaType.APPLICATION_JSON))
+
+        then: 'Film removed successfully'
+        removeMatrixFromBoxResultAction
+                .andExpect(status().isOk())
+
+        when: 'I get box details'
+        ResultActions getDetailsResultAction = this.mockMvc
+                .perform(get('/api/rentals/box')
+                .session(httpSession))
+
+        RentalOrderDraftDTO emptyRentalOrderDraft = expectedRentalOrderDraft.builder()
+                .totalPrice(BigDecimal.ZERO)
+                .films(Arrays.asList())
+                .build()
+
+        then: 'There is not Matrix in box'
+        getDetailsResultAction
+                .andExpect(status().isOk())
+                .andExpect(content().json(buildJson(emptyRentalOrderDraft)))
+    }
+}

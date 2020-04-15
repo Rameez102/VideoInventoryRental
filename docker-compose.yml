@@ -1,0 +1,15 @@
+version: '3.5'
+services:
+  inventory-rental:
+    build: .
+    volumes:
+    - .:/app
+    - ~/.m2:/root/.m2
+    working_dir: /app
+    ports:
+      - 8080:8080
+      - 5005:5005
+    command: >
+      sh -c "mvn clean install -Ptest &&
+             mvn spring-boot:run -Dspring.profiles.active=test"
+
